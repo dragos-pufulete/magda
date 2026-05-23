@@ -137,56 +137,7 @@ body {
   border-top: 1px solid var(--border);
 }
 
-.nav-footer-label {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text3);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
-  padding: 0 2px;
-}
 
-.token-input {
-  width: 100%;
-  font-family: var(--mono);
-  font-size: 11px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 7px 9px;
-  color: var(--text);
-  outline: none;
-  margin-bottom: 7px;
-  transition: border-color 0.15s;
-}
-
-.token-input:focus { border-color: var(--blue); }
-.token-input::placeholder { color: var(--text3); }
-
-.save-btn {
-  width: 100%;
-  background: var(--blue);
-  border: none;
-  border-radius: var(--radius);
-  color: #fff;
-  font-family: var(--font);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 7px;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.save-btn:hover { opacity: 0.9; }
-
-.save-status {
-  font-size: 11px;
-  color: var(--green);
-  text-align: center;
-  margin-top: 5px;
-  height: 14px;
-}
 
 /* ── Dashboard (center) ── */
 .dashboard {
@@ -769,10 +720,9 @@ body {
   </div>
 
   <div class="nav-footer">
-    <div class="nav-footer-label">Todoist Token</div>
-    <input class="token-input" id="todoist-token" type="password" placeholder="Paste API token..." />
-    <button class="save-btn" onclick="saveSettings()">Save</button>
-    <div class="save-status" id="save-status"></div>
+    <div style="font-size:11px;color:var(--text3);text-align:center;line-height:1.6">
+      Token stored securely<br>in Cloudflare Worker
+    </div>
   </div>
 </nav>
 
@@ -954,19 +904,13 @@ body {
 
 <script>
 var WORKER      = 'https://magda.pdf-account.workers.dev';
-var history     = [];
-var token       = '';
+var msgHistory  = [];
+
 var busy        = false;
 var statTasks   = 0;
 var statMsgs    = 0;
 
-function saveSettings() {
-  var t = document.getElementById('todoist-token').value.trim();
-  if (t) token = t;
-  var s = document.getElementById('save-status');
-  s.textContent = 'Saved';
-  setTimeout(function(){ s.textContent = ''; }, 2000);
-}
+function saveSettings() {}
 
 function autoResize(el) {
   el.style.height = 'auto';
@@ -1108,16 +1052,16 @@ function buildPlanCard(tasks) {
 }
 
 async function executePlan(tasks, approveBtn, discardBtn, actions) {
-  if (!token) { alert('No Todoist token found. Please paste your token in the left sidebar and click Save.'); return; }
+  
   approveBtn.disabled = true;
   discardBtn.disabled = true;
   approveBtn.textContent = 'Sending...';
 
   try {
-    var res = await fetch(WORKER + '/execute', {
+    var res = await fetch(WORKER + '/teo/exec', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ token: token, tasks: tasks })
+      body:    JSON.stringify({ tasks: tasks })
     });
     var results = await res.json();
     var ok  = results.filter(function(r){ return r.status === 'success'; }).length;
@@ -1181,7 +1125,7 @@ async function sendMessage() {
   document.getElementById('send-btn').disabled = true;
 
   addMessage('user', text);
-  history.push({ role: 'user', content: text });
+  msgHistory.push({ role: 'user', content: text });
   statMsgs++;
   document.getElementById('stat-msgs').textContent = statMsgs;
   showTyping();
@@ -1190,13 +1134,13 @@ async function sendMessage() {
     var routeRes = await fetch(WORKER + '/route', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ message: text, history: history.slice(-8) })
+      body:    JSON.stringify({ message: text, history: msgHistory.slice(-8) })
     });
     var route = await routeRes.json();
 
     if (route.agent === 'TEO') {
       addLog('<strong>MAGDA</strong> routed to TEO · ' + route.reason, 'teo');
-      var teoRes = await fetch(WORKER + '/teo', {
+      var teoRes = await fetch(WORKER + '/teo/plan', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ raw_tasks: route.teo_input || text, horizon: 'today' })
@@ -1207,7 +1151,7 @@ async function sendMessage() {
       if (teoData.tasks && teoData.tasks.length) {
         var reply = 'I\'ve organized your tasks into a plan. Review it and approve when ready.';
         addMessage('assistant', reply, 'TEO', teoData.tasks);
-        history.push({ role: 'assistant', content: reply });
+        msgHistory.push({ role: 'assistant', content: reply });
       } else {
         addMessage('assistant', 'TEO couldn\'t parse those tasks. Could you be more specific?', 'TEO');
       }
@@ -1216,13 +1160,13 @@ async function sendMessage() {
       var chatRes = await fetch(WORKER + '/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ message: text, history: history.slice(-8) })
+        body:    JSON.stringify({ message: text, history: msgHistory.slice(-8) })
       });
       var chatData = await chatRes.json();
       hideTyping();
       var reply = chatData.reply || 'Something went wrong. Please try again.';
       addMessage('assistant', reply, null);
-      history.push({ role: 'assistant', content: reply });
+      msgHistory.push({ role: 'assistant', content: reply });
     }
   } catch(e) {
     hideTyping();
