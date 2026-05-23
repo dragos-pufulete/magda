@@ -1108,7 +1108,7 @@ function buildPlanCard(tasks) {
 }
 
 async function executePlan(tasks, approveBtn, discardBtn, actions) {
-  if (!token) { alert('Please paste your Todoist token in the sidebar and save.'); return; }
+  if (!token) { alert('No Todoist token found. Please paste your token in the left sidebar and click Save.'); return; }
   approveBtn.disabled = true;
   discardBtn.disabled = true;
   approveBtn.textContent = 'Sending...';
@@ -1228,11 +1228,11 @@ async function sendMessage() {
     hideTyping();
     addMessage('assistant', 'Could not reach the MAGDA worker. Check your Cloudflare Worker is deployed.');
     addLog('Connection error', 'err');
+  } finally {
+    busy = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('chat-input').focus();
   }
-
-  busy = false;
-  document.getElementById('send-btn').disabled = false;
-  document.getElementById('chat-input').focus();
 }
 </script>
 </body>
